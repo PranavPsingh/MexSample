@@ -11,8 +11,10 @@ Vite · React 18 · TypeScript · Three.js via @react-three/fiber + drei · reac
 ## GitHub Pages
 The production build uses the `/MexSample/` project-pages path and hash-based routes,
 so it can be deployed as a static site and page refreshes work on GitHub Pages.
-Publish the contents of `dist/` using GitHub Pages. For a differently named repository,
-update the production `base` in `vite.config.ts` to match its Pages URL path.
+The `Deploy to GitHub Pages` workflow builds and publishes `dist/` on pushes to
+`Sample-1`. In the repository settings, set **Pages → Build and deployment → Source**
+to **GitHub Actions**. For a differently named repository, update the production
+`base` in `vite.config.ts` to match its Pages URL path.
 
 ## What's where
 | Path | What it does |
