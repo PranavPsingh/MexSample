@@ -8,6 +8,12 @@ Vite · React 18 · TypeScript · Three.js via @react-three/fiber + drei · reac
     npm run build      # type-check + production build into dist/
     npm run preview    # serve the production build
 
+## GitHub Pages
+The production build uses the `/MexSample/` project-pages path and hash-based routes,
+so it can be deployed as a static site and page refreshes work on GitHub Pages.
+Publish the contents of `dist/` using GitHub Pages. For a differently named repository,
+update the production `base` in `vite.config.ts` to match its Pages URL path.
+
 ## What's where
 | Path | What it does |
 |---|---|
