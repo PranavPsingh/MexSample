@@ -309,7 +309,7 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
 
       const dy = start.y - e.clientY
       const dx = start.x - e.clientX
-      const dist = horizontal ? dx : dy
+      const dist = horizontal && Math.abs(dx) > Math.abs(dy) ? dx : dy
       if (Math.abs(dist) < 40) return
       suppressClick.current = true
       const speed = Math.abs(dist) / Math.max(1, performance.now() - start.time) // px per ms
