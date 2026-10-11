@@ -307,7 +307,7 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
       swipeStart.current = null
       if (pausedRef.current) return
 
-      const dy = e.clientY - start.y
+      const dy = start.y - e.clientY
       const dx = start.x - e.clientX
       const dist = horizontal && Math.abs(dx) > Math.abs(dy) ? dx : dy
       if (Math.abs(dist) < 40) return
