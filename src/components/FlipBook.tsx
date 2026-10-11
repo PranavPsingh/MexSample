@@ -4,8 +4,7 @@ import { artDataUrl } from '../lib/art'
 import { clamp } from '../lib/math'
 
 /**
- * Vertical flip-book. Two cards are stacked and visible at once, with the "spine" running
- * horizontally through the middle (like a notepad / wall calendar).
+ * Two-card flip-book on desktop; mobile turns one full-width page at a time.
  *
  *  - slow / normal scroll: the bottom card swings UP over the spine and becomes the top card,
  *    the old top card fades away, the next card rises into the bottom slot.
@@ -63,7 +62,8 @@ function CardFace({ p, i }: { p: Project; i: number }) {
 
 export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }: Props) {
   const N = projects.length
-  const max = Math.max(0, N - 2)
+  const [horizontal, setHorizontal] = useState(() => window.matchMedia('(max-width: 720px)').matches)
+  const max = Math.max(0, N - (horizontal ? 1 : 2))
   const [target, setTarget] = useState(clamp(initialIndex, 0, max))
   const targetRef = useRef(target)
   const posRef = useRef(target)
@@ -71,9 +71,28 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
   const fastRef = useRef(false)
   const fastUntil = useRef(0)
   const pausedRef = useRef(!!paused)
+  const bookRef = useRef<HTMLDivElement>(null)
+  const swipeStart = useRef<{ x: number; y: number; time: number; pointerId: number } | null>(null)
+  const suppressClick = useRef(false)
   const leaves = useRef<(HTMLDivElement | null)[]>([])
   const [fast, setFast] = useState(false)
   pausedRef.current = !!paused
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 720px)')
+    const updateOrientation = () => setHorizontal(media.matches)
+    updateOrientation()
+    media.addEventListener('change', updateOrientation)
+    return () => media.removeEventListener('change', updateOrientation)
+  }, [])
+
+  useEffect(() => {
+    if (targetRef.current > max) {
+      targetRef.current = max
+      posRef.current = Math.min(posRef.current, max)
+      setTarget(max)
+    }
+  }, [max])
 
   const step = useCallback(
     (delta: number) => {
@@ -91,6 +110,37 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
       for (let k = 0; k < N; k++) {
         const el = leaves.current[k]
         if (!el) continue
+        if (horizontal) {
+          const direction = targetRef.current === pos ? 0 : targetRef.current > pos ? 1 : -1
+          const from = direction > 0 ? Math.floor(pos) : direction < 0 ? Math.ceil(pos) : Math.round(pos)
+          const progress = direction === 0 ? 0 : direction > 0 ? pos - from : from - pos
+          const incoming = from + direction
+          const isCurrent = k === from
+          const isIncoming = direction !== 0 && k === incoming
+
+          if (!isCurrent && !isIncoming) {
+            el.style.transform = 'rotateY(0deg)'
+            el.style.opacity = '0'
+            el.style.zIndex = '0'
+            el.style.visibility = 'hidden'
+            el.style.pointerEvents = 'none'
+            el.dataset.slot = ''
+            continue
+          }
+
+          const angle = isCurrent ? -direction * progress * 180 : direction * (1 - progress) * 180
+          el.style.transform = `rotateY(${angle}deg)`
+          el.style.opacity = '1'
+          el.style.zIndex = isIncoming ? '2' : '1'
+          el.style.visibility = 'visible'
+          el.style.setProperty('--shade', (Math.sin(progress * Math.PI) * 0.4).toFixed(3))
+          el.style.pointerEvents = direction === 0 && isCurrent ? 'auto' : 'none'
+          el.dataset.slot = isCurrent ? 'current' : 'next'
+          const face = el.firstElementChild as HTMLElement | null
+          if (face) face.style.transform = Math.abs(angle) > 90 ? 'scaleX(-1)' : 'none'
+          continue
+        }
+
         const d = k - pos // 0 = top slot, 1 = bottom slot
         let tf = ''
         let op = 1
@@ -99,22 +149,27 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
 
         if (d >= 2) {
           op = 0
-          tf = 'translate3d(0,26px,-60px)'
+          tf = horizontal ? 'translate3d(26px,0,-60px)' : 'translate3d(0,26px,-60px)'
         } else if (d > 1) {
-          const a = 2 - d // arriving from underneath into the bottom slot
+          const a = 2 - d // arriving into the next slot
           op = a
-          tf = `translate3d(0,${(1 - a) * 26}px,${-60 * (1 - a)}px)`
+          tf = horizontal
+            ? `translate3d(${(1 - a) * 26}px,0,${-60 * (1 - a)}px)`
+            : `translate3d(0,${(1 - a) * 26}px,${-60 * (1 - a)}px)`
         } else {
           u = clamp((1 - d) / W, 0, 1)
           const th = u * 180
+          const rotation = horizontal ? `rotateY(${th}deg)` : `rotateX(${th}deg)`
           if (d >= 0) {
-            tf = `rotateX(${th}deg)`
+            tf = rotation
           } else if (d > -1) {
             op = 1 + d
-            tf = `translate3d(0,${d * 36}px,${d * 36}px) rotateX(${th}deg)`
+            tf = horizontal
+              ? `translate3d(${d * 36}px,0,${d * 36}px) ${rotation}`
+              : `translate3d(0,${d * 36}px,${d * 36}px) ${rotation}`
           } else {
             op = 0
-            tf = `translate3d(0,-36px,-36px) rotateX(${th}deg)`
+            tf = horizontal ? `translate3d(-36px,0,-36px) ${rotation}` : `translate3d(0,-36px,-36px) ${rotation}`
           }
           z = u > 0 && u < 1 ? Math.round(10 + (1 - Math.abs(0.5 - u)) * 40 - Math.max(0, d) * 4) : 0
         }
@@ -126,13 +181,13 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
         el.style.setProperty('--shade', (Math.sin(u * Math.PI) * 0.4).toFixed(3))
         const resting = Math.abs(d) < 0.02 || Math.abs(d - 1) < 0.02
         el.style.pointerEvents = resting ? 'auto' : 'none'
-        el.dataset.slot = u > 0.5 ? 'top' : 'bottom'
+        el.dataset.slot = u > 0.5 ? 'current' : 'next'
         // past the half-way point the page is edge-on, so un-mirroring the face is invisible
         const face = el.firstElementChild as HTMLElement | null
-        if (face) face.style.transform = u > 0.5 ? 'scaleY(-1)' : 'none'
+        if (face) face.style.transform = u > 0.5 ? (horizontal ? 'scaleX(-1)' : 'scaleY(-1)') : 'none'
       }
     },
-    [N],
+    [N, horizontal],
   )
 
   // animation loop: spring toward target, riffle spread, fast-mode expiry
@@ -185,6 +240,18 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
       const speed = events.reduce((s, x) => s + x.d, 0)
       const dir = dy > 0 ? 1 : -1
 
+      if (horizontal) {
+        if (now - accT > 220) acc = 0
+        accT = now
+        acc += dy
+        if (Math.abs(acc) >= TUNING.stepThresholdPx && now - lastStep > TUNING.stepCooldownMs) {
+          lastStep = now
+          acc = 0
+          step(dir)
+        }
+        return
+      }
+
       if (speed > TUNING.fastSpeedPx) {
         enterFast(now)
         if (now - lastStep > TUNING.fastStepEveryMs) {
@@ -224,43 +291,67 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
       else if (e.key === 'End') step(N)
     }
 
-    let ty = 0
-    let tx = 0
-    let tt = 0
-    const onTouchStart = (e: TouchEvent) => {
-      ty = e.touches[0].clientY
-      tx = e.touches[0].clientX
-      tt = performance.now()
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || pausedRef.current) return
+      suppressClick.current = false
+      swipeStart.current = {
+        x: e.clientX,
+        y: e.clientY,
+        time: performance.now(),
+        pointerId: e.pointerId,
+      }
     }
-    const onTouchEnd = (e: TouchEvent) => {
+    const onPointerUp = (e: PointerEvent) => {
+      const start = swipeStart.current
+      if (!start || start.pointerId !== e.pointerId) return
+      swipeStart.current = null
       if (pausedRef.current) return
-      const dy = ty - e.changedTouches[0].clientY
-      const dx = tx - e.changedTouches[0].clientX
-      const dist = Math.abs(dy) > Math.abs(dx) ? dy : dx
+
+      const dy = start.y - e.clientY
+      const dx = e.clientX - start.x
+      const dist = horizontal ? dx : dy
       if (Math.abs(dist) < 40) return
-      const speed = Math.abs(dist) / Math.max(1, performance.now() - tt) // px per ms
+      suppressClick.current = true
+      const speed = Math.abs(dist) / Math.max(1, performance.now() - start.time) // px per ms
       const dir = dist > 0 ? 1 : -1
       if (speed > 1.6) {
-        enterFast(performance.now())
+        const now = performance.now()
+        enterFast(now)
         step(dir * Math.min(6, Math.round(speed * 2)))
       } else step(dir)
+    }
+    const onPointerCancel = (e: PointerEvent) => {
+      if (swipeStart.current?.pointerId === e.pointerId) swipeStart.current = null
     }
 
     window.addEventListener('wheel', onWheel, { passive: false })
     window.addEventListener('keydown', onKey)
-    window.addEventListener('touchstart', onTouchStart, { passive: true })
-    window.addEventListener('touchend', onTouchEnd, { passive: true })
+    const book = bookRef.current
+    book?.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerCancel)
     return () => {
       window.removeEventListener('wheel', onWheel)
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('touchstart', onTouchStart)
-      window.removeEventListener('touchend', onTouchEnd)
+      book?.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerCancel)
     }
-  }, [step, N])
+  }, [step, N, horizontal])
 
   return (
     <div className="flip">
-      <div className={'book' + (fast ? ' riffling' : '')} aria-label="Project flip book">
+      <div
+        ref={bookRef}
+        className={`book${fast ? ' riffling' : ''}${horizontal ? ' horizontal' : ''}`}
+        aria-label="Project flip book"
+        onClickCapture={(e) => {
+          if (!suppressClick.current) return
+          e.preventDefault()
+          e.stopPropagation()
+          suppressClick.current = false
+        }}
+      >
         {projects.map((p, i) => (
           <div
             key={p.id}
@@ -270,8 +361,8 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
             className="leaf"
             onClick={(e) => {
               const slot = (e.currentTarget as HTMLDivElement).dataset.slot
-              if (slot === 'top' && i === targetRef.current) onOpen(p)
-              else if (slot === 'bottom' && i === targetRef.current + 1) onOpen(p)
+              if (slot === 'current' && i === targetRef.current) onOpen(p)
+              else if (slot === 'next' && i === targetRef.current + 1) onOpen(p)
             }}
           >
             <div className="face">
@@ -283,10 +374,11 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
 
       <div className="flip-ui">
         <button className="btn sm" onClick={() => step(-1)} disabled={target <= 0} aria-label="Previous">
-          ↑
+          {horizontal ? '←' : '↑'}
         </button>
         <div className="flip-count">
-          <b>{String(target + 1).padStart(2, '0')}</b>–<b>{String(target + 2).padStart(2, '0')}</b>
+          <b>{String(target + 1).padStart(2, '0')}</b>
+          {!horizontal && <>–<b>{String(target + 2).padStart(2, '0')}</b></>}
           <span> / {String(N).padStart(2, '0')}</span>
         </div>
         <div className="ticks">
@@ -295,10 +387,10 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
           ))}
         </div>
         <button className="btn sm" onClick={() => step(1)} disabled={target >= max} aria-label="Next">
-          ↓
+          {horizontal ? '→' : '↓'}
         </button>
       </div>
-      <p className="flip-hint">Scroll to flip · scroll fast to riffle</p>
+      <p className="flip-hint">{horizontal ? 'Swipe left/right to flip · swipe fast to riffle' : 'Scroll to flip · scroll fast to riffle'}</p>
     </div>
   )
 }

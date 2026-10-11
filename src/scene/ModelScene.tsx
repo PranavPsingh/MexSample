@@ -50,6 +50,7 @@ function Plane({ p, i, onSelect }: { p: Project; i: number; onSelect: (id: strin
         }}
         onClick={(e) => {
           e.stopPropagation()
+          if (e.delta > 4) return
           onSelect(p.id)
         }}
       >
@@ -115,6 +116,8 @@ export default function ModelScene({ onSelect }: { onSelect: (id: string) => voi
       ))}
       <OrbitControls
         makeDefault
+        enableRotate
+        enableDamping
         enablePan={false}
         enableZoom={false}
         minPolarAngle={0.55}

@@ -5,7 +5,7 @@ import { artDataUrl } from '../lib/art'
 import { inr, useCart } from '../store/cart'
 
 function ProductCard({ p }: { p: Product }) {
-  const { dispatch, setOpen } = useCart()
+  const { dispatch } = useCart()
   const ref = useRef<HTMLDivElement>(null)
   const [added, setAdded] = useState(false)
 
@@ -46,7 +46,6 @@ function ProductCard({ p }: { p: Product }) {
           dispatch({ type: 'add', product: p })
           setAdded(true)
           window.setTimeout(() => setAdded(false), 1200)
-          setOpen(true)
         }}
       >
         <span>{added ? 'Added ✓' : 'Add to cart'}</span>

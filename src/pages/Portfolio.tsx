@@ -44,7 +44,7 @@ export default function Portfolio() {
           <Suspense fallback={<div className="loading">Loading the model…</div>}>
             <ModelScene onSelect={(id) => setSp({ open: id })} />
           </Suspense>
-          <p className="flip-hint">Drag to orbit · click a plane to open it</p>
+          <p className="flip-hint">Drag or swipe to rotate · tap a plane to open it</p>
         </div>
       )}
 

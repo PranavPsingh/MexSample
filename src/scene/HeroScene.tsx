@@ -14,6 +14,7 @@ import { clamp, damp, lerp, smooth } from '../lib/math'
  */
 
 type Prog = MutableRefObject<{ v: number }>
+type PointerPosition = { x: number; y: number }
 type Piece = { kind: 'box' | 'cyl' | 'cone' | 'sphere'; x: number; z: number; w: number; h: number; d: number; color: string }
 interface SlabDef {
   id: string
@@ -234,17 +235,17 @@ function IsoBox({ prog }: { prog: Prog }) {
   )
 }
 
-function Rig({ prog }: { prog: Prog }) {
+function Rig({ prog, pointer }: { prog: Prog; pointer: PointerPosition }) {
   const { camera, size } = useThree()
-  useFrame((st) => {
+  const mouse = useRef<PointerPosition>({ x: 0, y: 0 })
+  useFrame((st, dt) => {
     const t = prog.current.v
     const s1 = smooth(clamp(t, 0, 1))
     const s2 = smooth(clamp(t - 1, 0, 1))
-    const elev = (lerp(88, 35.264, s1) * Math.PI) / 180
-    const az =
-      (lerp(0, 45, s1) * Math.PI) / 180 +
-      st.pointer.x * 0.2 * (0.25 + 0.75 * s1) +
-      s2 * Math.sin(st.clock.elapsedTime * 0.25) * 0.12
+    mouse.current.x = damp(mouse.current.x, pointer.x, 5, dt)
+    mouse.current.y = damp(mouse.current.y, pointer.y, 5, dt)
+    const elev = clamp((lerp(88, 35.264, s1) * Math.PI) / 180 + mouse.current.y * 0.42 * s1, 0.2, 1.52)
+    const az = (lerp(0, 45, s1) * Math.PI) / 180 + mouse.current.x * 0.72 * s1
     const ty = lerp(0, lerp(2.2, 3.3, s2), s1)
     const r = 40
     camera.position.set(r * Math.cos(elev) * Math.sin(az), ty + r * Math.sin(elev), r * Math.cos(elev) * Math.cos(az))
@@ -254,6 +255,28 @@ function Rig({ prog }: { prog: Prog }) {
     cam.zoom = unit * lerp(1.15, 1.0, s1) * lerp(1, 0.8, s2)
     cam.updateProjectionMatrix()
   })
+  return null
+}
+
+function MouseFollow({ pointer }: { pointer: PointerPosition }) {
+  useEffect(() => {
+    const onMouseMove = (event: MouseEvent) => {
+      pointer.x = clamp((event.clientX / window.innerWidth) * 2 - 1, -1, 1)
+      pointer.y = clamp(1 - (event.clientY / window.innerHeight) * 2, -1, 1)
+    }
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerType !== 'touch') return
+      pointer.x = clamp((event.clientX / window.innerWidth) * 2 - 1, -1, 1)
+      pointer.y = clamp(1 - (event.clientY / window.innerHeight) * 2, -1, 1)
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('pointermove', onPointerMove)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('pointermove', onPointerMove)
+    }
+  }, [pointer])
+
   return null
 }
 
@@ -267,6 +290,7 @@ function Director({ stage, prog }: { stage: number; prog: Prog }) {
 
 export default function HeroScene({ stage, onSelect }: { stage: number; onSelect: (id: string) => void }) {
   const prog = useRef({ v: 0 })
+  const pointer = useRef<PointerPosition>({ x: 0, y: 0 })
   const [ready, setReady] = useState(false)
   useEffect(() => {
     setReady(true)
@@ -284,7 +308,8 @@ export default function HeroScene({ stage, onSelect }: { stage: number; onSelect
       gl={{ antialias: true, alpha: true }}
     >
       <Director stage={stage} prog={prog} />
-      <Rig prog={prog} />
+      <MouseFollow pointer={pointer.current} />
+      <Rig prog={prog} pointer={pointer.current} />
       <ambientLight intensity={1.0} />
       <hemisphereLight args={['#ffffff', '#e9e3d6', 0.5]} />
       <directionalLight

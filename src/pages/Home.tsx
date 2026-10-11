@@ -75,33 +75,34 @@ export default function Home() {
           <HeroScene stage={stage} onSelect={(id) => nav(`/portfolio?open=${id}`)} />
         </Suspense>
       </div>
+      <span className="home-drag-hint">Touch and drag to rotate</span>
 
-      <div className="hud">
-        <div className="hud-title">
-          <p className="note">Portfolio + Sale</p>
-          <h1>
-            Mehak
-            <br />
-            Singh
-          </h1>
-          <p className="hud-sub">Architecture, drawings, art &amp; small objects.</p>
-        </div>
-
-        <div className="hud-stage" aria-live="polite">
-          <span className="note">{s.n} / 03</span>
-          <b>{s.t}</b>
-          <span>{s.d}</span>
-          <div className="dots">
-            {STAGES.map((x, i) => (
-              <button key={x.n} className={i === stage ? 'on' : ''} onClick={() => jump(i)} aria-label={`Stage ${x.n}: ${x.t}`} />
-            ))}
+      <div className={stage === 0 ? 'hud' : 'hud hud-view-only'} aria-live="polite">
+        {stage === 0 && (
+          <div className="hud-title">
+            <p className="note">Portfolio + Sale</p>
+            <h1>
+              Mehak
+              <br />
+              Singh
+            </h1>
+            <p className="hud-sub">Architecture, drawings, art &amp; small objects.</p>
           </div>
-          {stage === 2 ? (
-            <button className="btn solid" onClick={() => nav('/portfolio')}>
-              <span>All projects →</span>
-            </button>
-          ) : (
-            <span className="hint">Scroll ↓</span>
+        )}
+
+        <div className="hud-view-label">
+          <span>{s.n} / 03</span>
+          <b>{s.t}</b>
+          {stage === 0 && (
+            <>
+              <span className="hud-view-description">{s.d}</span>
+              <div className="dots">
+                {STAGES.map((x, i) => (
+                  <button key={x.n} className={i === stage ? 'on' : ''} onClick={() => jump(i)} aria-label={`Stage ${x.n}: ${x.t}`} />
+                ))}
+              </div>
+              <span className="hint">Scroll ↓</span>
+            </>
           )}
         </div>
       </div>
