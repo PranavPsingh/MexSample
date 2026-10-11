@@ -266,8 +266,8 @@ function MouseFollow({ pointer }: { pointer: PointerPosition }) {
     }
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerType !== 'touch') return
-      pointer.x = clamp((event.clientX / window.innerWidth) * 2 - 1, -1, 1)
-      pointer.y = clamp(1 - (event.clientY / window.innerHeight) * 2, -1, 1)
+      pointer.x = clamp(1 - (event.clientX / window.innerWidth) * 2, -1, 1)
+      pointer.y = clamp((event.clientY / window.innerHeight) * 2 - 1, -1, 1)
     }
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('pointermove', onPointerMove)

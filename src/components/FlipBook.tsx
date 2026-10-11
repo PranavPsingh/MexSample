@@ -308,7 +308,7 @@ export default function FlipBook({ projects, initialIndex = 0, onOpen, paused }:
       if (pausedRef.current) return
 
       const dy = start.y - e.clientY
-      const dx = e.clientX - start.x
+      const dx = start.x - e.clientX
       const dist = horizontal ? dx : dy
       if (Math.abs(dist) < 40) return
       suppressClick.current = true
