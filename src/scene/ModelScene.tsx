@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { projects } from '../data/projects'
 import type { Project } from '../data/projects'
 import { makeArtCanvas } from '../lib/art'
-import { damp } from '../lib/math'
+import { clamp, damp } from '../lib/math'
 
 /** Wireframe "Option 2": a white slab with the projects standing on it as planes. */
 
@@ -79,7 +79,50 @@ function Fit() {
   return null
 }
 
+function MouseFollowCamera() {
+  const { camera } = useThree()
+  const pointer = useRef({ x: 0, y: 0 })
+  const position = useRef({ x: 0, y: 0 })
+
+  useEffect(() => {
+    const onMouseMove = (event: MouseEvent) => {
+      pointer.current.x = (event.clientX / window.innerWidth) * 2 - 1
+      pointer.current.y = 1 - (event.clientY / window.innerHeight) * 2
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    return () => window.removeEventListener('mousemove', onMouseMove)
+  }, [])
+
+  useFrame((_, dt) => {
+    position.current.x = damp(position.current.x, pointer.current.x, 4, dt)
+    position.current.y = damp(position.current.y, pointer.current.y, 4, dt)
+
+    const targetY = 0.8
+    const radius = 19.8
+    const azimuth = Math.PI / 4 + position.current.x * 0.58
+    const polar = clamp(1.02 - position.current.y * 0.22, 0.62, 1.35)
+    camera.position.set(
+      radius * Math.sin(polar) * Math.sin(azimuth),
+      targetY + radius * Math.cos(polar),
+      radius * Math.sin(polar) * Math.cos(azimuth),
+    )
+    camera.lookAt(0, targetY, 0)
+  })
+
+  return null
+}
+
 export default function ModelScene({ onSelect }: { onSelect: (id: string) => void }) {
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 720px)').matches)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 720px)')
+    const updateMobile = () => setMobile(media.matches)
+    updateMobile()
+    media.addEventListener('change', updateMobile)
+    return () => media.removeEventListener('change', updateMobile)
+  }, [])
+
   return (
     <Canvas
       className="hero-canvas ready"
@@ -90,6 +133,7 @@ export default function ModelScene({ onSelect }: { onSelect: (id: string) => voi
       gl={{ antialias: true, alpha: true }}
     >
       <Fit />
+      {!mobile && <MouseFollowCamera />}
       <ambientLight intensity={1.0} />
       <hemisphereLight args={['#ffffff', '#e9e3d6', 0.5]} />
       <directionalLight
@@ -116,14 +160,13 @@ export default function ModelScene({ onSelect }: { onSelect: (id: string) => voi
       ))}
       <OrbitControls
         makeDefault
-        enableRotate
+        enabled={mobile}
+        enableRotate={mobile}
         enableDamping
         enablePan={false}
         enableZoom={false}
         minPolarAngle={0.55}
         maxPolarAngle={1.25}
-        autoRotate
-        autoRotateSpeed={0.5}
         target={[0, 0.8, 0]}
       />
     </Canvas>
